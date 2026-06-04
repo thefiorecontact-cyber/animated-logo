@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Animated Logo</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #0a0a0f;
+    }
+
+    .logo {
+      width: min(90vw, 740px);
+      height: auto;
+    }
+
+    .logo svg {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="logo" aria-label="Logo">
+    <svg width="1480" height="825" viewBox="0 0 1480 825" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <g id="logo">
+        <rect width="1480" height="825" fill="white"/>
+        <path id="tracciato" d="M977 554L740.5 648.5L504 554V176L740.5 270.5L977 176V554Z" stroke="black" stroke-width="12" stroke-linejoin="round"/>
+        <path id="linea" d="M740 294.5V625" stroke="black" stroke-width="12"/>
+        <g id="m">
+          <g transform="translate(-503.5 -176.5)">
+            <rect x="440" y="106" width="127" height="141" rx="10" fill="white"/>
+            <path d="M471.811 192.33L470.25 150.245L497.552 223.739H508.81L536.176 150.203L534.614 192.33V223.739H550.488V129.251H529.807L503.244 202.129L476.618 129.251H456V223.739H471.811V192.33Z" fill="black"/>
+          </g>
+        </g>
+        <g id="t">
+          <g transform="translate(-977 -554.5)">
+            <rect x="923" y="484" width="108" height="141" rx="10" fill="white"/>
+            <path fill-rule="evenodd" clip-rule="evenodd" d="M968.479 520.073H939.081V507.094H1014.3V520.073H984.638V601.582H968.479V520.073Z" fill="black"/>
+          </g>
+        </g>
+      </g>
+    </svg>
+  </div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "animejs": "https://cdn.jsdelivr.net/npm/animejs@4.4.1/dist/modules/index.js",
+      "animejs/svg": "https://cdn.jsdelivr.net/npm/animejs@4.4.1/dist/modules/svg/index.js"
+    }
+  }
+  </script>
+  <script type="module">
+    import { animate } from 'animejs';
+    import { createMotionPath } from 'animejs/svg';
+
+    const path = document.getElementById('tracciato');
+
+    function pathOffsetAt(x, y) {
+      const length = path.getTotalLength();
+      let best = 0;
+      let bestDist = Infinity;
+      const steps = 500;
+
+      for (let i = 0; i <= steps; i++) {
+        const t = (i / steps) * length;
+        const p = path.getPointAtLength(t);
+        const dist = (p.x - x) ** 2 + (p.y - y) ** 2;
+        if (dist < bestDist) {
+          bestDist = dist;
+          best = t / length;
+        }
+      }
+
+      return best;
+    }
+
+    const mOffset = pathOffsetAt(503.5, 176.5);
+    const tOffset = pathOffsetAt(977, 554.5);
+    const { translateX: mX, translateY: mY } = createMotionPath('#tracciato', mOffset);
+    const { translateX: tX, translateY: tY } = createMotionPath('#tracciato', tOffset);
+
+    const motion = {
+      ease: 'linear',
+      duration: 6000,
+      loop: true,
+    };
+
+    animate('#m', { translateX: mX, translateY: mY, ...motion });
+    animate('#t', { translateX: tX, translateY: tY, ...motion, reversed: true });
+  </script>
+</body>
+</html>
