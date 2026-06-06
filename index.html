@@ -63,43 +63,169 @@
   }
   </script>
   <script type="module">
-    import { animate } from 'animejs';
-    import { createMotionPath } from 'animejs/svg';
-
     const path = document.getElementById('tracciato');
+    const pathLength = path.getTotalLength();
+
+    const PAUSE_MS = 500;
+    const MOVE_MS = 2200;
+    const SPEED = pathLength / MOVE_MS;
+
+    const letters = {
+      m: document.getElementById('m'),
+      t: document.getElementById('t'),
+    };
+
+    const corners = [
+      { x: 977, y: 554 },
+      { x: 740.5, y: 648.5 },
+      { x: 504, y: 554 },
+      { x: 504, y: 176 },
+      { x: 740.5, y: 270.5 },
+      { x: 977, y: 176 },
+    ];
 
     function pathOffsetAt(x, y) {
-      const length = path.getTotalLength();
       let best = 0;
       let bestDist = Infinity;
-      const steps = 500;
 
-      for (let i = 0; i <= steps; i++) {
-        const t = (i / steps) * length;
+      for (let i = 0; i <= 500; i++) {
+        const t = (i / 500) * pathLength;
         const p = path.getPointAtLength(t);
         const dist = (p.x - x) ** 2 + (p.y - y) ** 2;
         if (dist < bestDist) {
           bestDist = dist;
-          best = t / length;
+          best = t / pathLength;
         }
       }
 
       return best;
     }
 
-    const mOffset = pathOffsetAt(503.5, 176.5);
-    const tOffset = pathOffsetAt(977, 554.5);
-    const { translateX: mX, translateY: mY } = createMotionPath('#tracciato', mOffset);
-    const { translateX: tX, translateY: tY } = createMotionPath('#tracciato', tOffset);
+    function normalizeOffset(offset) {
+      return ((offset % 1) + 1) % 1;
+    }
 
-    const motion = {
-      ease: 'linear',
-      duration: 12000,
-      loop: true,
-    };
+    function offsetDistance(from, to, forward) {
+      if (forward) {
+        return to >= from ? to - from : 1 - from + to;
+      }
+      return to <= from ? from - to : from + (1 - to);
+    }
 
-    animate('#m', { translateX: mX, translateY: mY, ...motion });
-    animate('#t', { translateX: tX, translateY: tY, ...motion, reversed: true });
+    function interpolateOffset(from, to, forward, progress) {
+      if (forward) {
+        const end = to >= from ? to : to + 1;
+        return normalizeOffset(from + (end - from) * progress);
+      }
+      const end = to <= from ? to : to - 1;
+      return normalizeOffset(from + (end - from) * progress);
+    }
+
+    function placeOnPath(letter, offset) {
+      const point = path.getPointAtLength(normalizeOffset(offset) * pathLength);
+      letters[letter].setAttribute('transform', `translate(${point.x} ${point.y})`);
+    }
+
+    function segmentDistance(fromOffset, toOffset, forward) {
+      return offsetDistance(fromOffset, toOffset, forward) * pathLength;
+    }
+
+    function animateSegment(letter, fromOffset, toOffset, forward, duration) {
+      return new Promise((resolve) => {
+        if (duration <= 0) {
+          placeOnPath(letter, toOffset);
+          resolve();
+          return;
+        }
+
+        const startTime = performance.now();
+
+        function frame(now) {
+          const t = Math.min((now - startTime) / duration, 1);
+          const offset = interpolateOffset(fromOffset, toOffset, forward, t);
+          placeOnPath(letter, offset);
+
+          if (t < 1) {
+            requestAnimationFrame(frame);
+          } else {
+            resolve();
+          }
+        }
+
+        requestAnimationFrame(frame);
+      });
+    }
+
+    function wait(ms) {
+      return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    const cornerOffsets = corners.map((corner) => pathOffsetAt(corner.x, corner.y));
+    const sortedCorners = [...cornerOffsets].sort((a, b) => a - b);
+    const mStart = pathOffsetAt(503.5, 176.5);
+
+    function closestCornerIndex(offset) {
+      return sortedCorners.reduce(
+        (best, cornerOffset, index) =>
+          Math.abs(cornerOffset - offset) < Math.abs(sortedCorners[best] - offset) ? index : best,
+        0,
+      );
+    }
+
+    function oppositeOffset(offset) {
+      const index = closestCornerIndex(offset);
+      return sortedCorners[(index + 3) % sortedCorners.length];
+    }
+
+    function buildSteps(startOffset, forward) {
+      const startIndex = closestCornerIndex(startOffset);
+      const ordered = Array.from({ length: sortedCorners.length }, (_, i) => {
+        const index = forward
+          ? (startIndex + i) % sortedCorners.length
+          : (startIndex - i + sortedCorners.length) % sortedCorners.length;
+        return sortedCorners[index];
+      });
+      const targets = [...ordered.slice(1), ordered[0]];
+
+      return ordered.map((from, i) => ({ from, to: targets[i], forward }));
+    }
+
+    function buildOppositeStep(mStep) {
+      return {
+        from: oppositeOffset(mStep.from),
+        to: oppositeOffset(mStep.to),
+        forward: mStep.forward,
+      };
+    }
+
+    async function runLoop() {
+      let forward = true;
+
+      while (true) {
+        const mSteps = buildSteps(mStart, forward);
+
+        for (let i = 0; i < mSteps.length; i++) {
+          const mStep = mSteps[i];
+          const tStep = buildOppositeStep(mStep);
+          const mDistance = segmentDistance(mStep.from, mStep.to, mStep.forward);
+          const tDistance = segmentDistance(tStep.from, tStep.to, tStep.forward);
+          const duration = Math.max(mDistance, tDistance) / SPEED;
+
+          await Promise.all([
+            animateSegment('m', mStep.from, mStep.to, mStep.forward, duration),
+            animateSegment('t', tStep.from, tStep.to, tStep.forward, duration),
+          ]);
+
+          await wait(PAUSE_MS);
+        }
+
+        forward = !forward;
+      }
+    }
+
+    placeOnPath('m', mStart);
+    placeOnPath('t', oppositeOffset(mStart));
+    runLoop();
   </script>
 </body>
 </html>
