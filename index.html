@@ -66,6 +66,7 @@
     const path = document.getElementById('tracciato');
     const pathLength = path.getTotalLength();
 
+    const INITIAL_DELAY_MS = 700;
     const PAUSE_MS = 500;
     const MOVE_MS = 2200;
     const SPEED = pathLength / MOVE_MS;
@@ -199,6 +200,8 @@
     }
 
     async function runLoop() {
+      await wait(INITIAL_DELAY_MS);
+
       let forward = true;
 
       while (true) {
