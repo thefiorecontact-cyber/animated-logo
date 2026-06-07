@@ -68,6 +68,7 @@
 
     const INITIAL_DELAY_MS = 700;
     const PAUSE_MS = 500;
+    const INTRO_LAP_MS = 1500;
     const MOVE_MS = 2200;
     const SPEED = pathLength / MOVE_MS;
 
@@ -135,6 +136,31 @@
       return t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
     }
 
+    function interpolateFullLap(startOffset, forward, progress) {
+      return normalizeOffset(startOffset + (forward ? progress : -progress));
+    }
+
+    function animateFullLap(letter, startOffset, forward, duration) {
+      return new Promise((resolve) => {
+        const startTime = performance.now();
+
+        function frame(now) {
+          const t = Math.min((now - startTime) / duration, 1);
+          const offset = interpolateFullLap(startOffset, forward, easeInOut(t));
+          placeOnPath(letter, offset);
+
+          if (t < 1) {
+            requestAnimationFrame(frame);
+          } else {
+            placeOnPath(letter, startOffset);
+            resolve();
+          }
+        }
+
+        requestAnimationFrame(frame);
+      });
+    }
+
     function animateSegment(letter, fromOffset, toOffset, forward, duration) {
       return new Promise((resolve) => {
         if (duration <= 0) {
@@ -168,6 +194,7 @@
     const cornerOffsets = corners.map((corner) => pathOffsetAt(corner.x, corner.y));
     const sortedCorners = [...cornerOffsets].sort((a, b) => a - b);
     const mStart = pathOffsetAt(503.5, 176.5);
+    const tStart = pathOffsetAt(977, 554.5);
 
     function closestCornerIndex(offset) {
       return sortedCorners.reduce(
@@ -203,9 +230,14 @@
       };
     }
 
-    async function runLoop() {
-      await wait(INITIAL_DELAY_MS);
+    async function runIntro() {
+      await Promise.all([
+        animateFullLap('m', mStart, true, INTRO_LAP_MS),
+        animateFullLap('t', tStart, true, INTRO_LAP_MS),
+      ]);
+    }
 
+    async function runMainLoop() {
       let forward = true;
 
       while (true) {
@@ -230,9 +262,16 @@
       }
     }
 
+    async function start() {
+      await wait(INITIAL_DELAY_MS);
+      await runIntro();
+      await wait(PAUSE_MS);
+      await runMainLoop();
+    }
+
     placeOnPath('m', mStart);
-    placeOnPath('t', oppositeOffset(mStart));
-    runLoop();
+    placeOnPath('t', tStart);
+    start();
   </script>
 </body>
 </html>
