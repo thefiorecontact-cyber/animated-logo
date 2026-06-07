@@ -131,6 +131,10 @@
       return offsetDistance(fromOffset, toOffset, forward) * pathLength;
     }
 
+    function easeInOut(t) {
+      return t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
+    }
+
     function animateSegment(letter, fromOffset, toOffset, forward, duration) {
       return new Promise((resolve) => {
         if (duration <= 0) {
@@ -143,7 +147,7 @@
 
         function frame(now) {
           const t = Math.min((now - startTime) / duration, 1);
-          const offset = interpolateOffset(fromOffset, toOffset, forward, t);
+          const offset = interpolateOffset(fromOffset, toOffset, forward, easeInOut(t));
           placeOnPath(letter, offset);
 
           if (t < 1) {
